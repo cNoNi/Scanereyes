@@ -57,5 +57,7 @@ dependencies {
     implementation(libs.androidx.camera.video)
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.extensions1)
+
+    implementation(libs.okhttp)
 }
 
