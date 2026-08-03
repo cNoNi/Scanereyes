@@ -3,7 +3,6 @@ package com.igorg.scanereyes
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import androidx.appcompat.app.AppCompatActivity
@@ -64,9 +63,7 @@ class MainActivity : AppCompatActivity() {
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Scanereyes")
-            }
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Scanereyes")
         }
 
         // Create output options object which contains file + metadata
@@ -168,9 +165,6 @@ class MainActivity : AppCompatActivity() {
         private val REQUIRED_PERMISSIONS = mutableListOf(
             Manifest.permission.CAMERA
         ).apply {
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            }
         }.toTypedArray()
     }
 
