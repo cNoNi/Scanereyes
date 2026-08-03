@@ -10,8 +10,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.ImageCapture
 import androidx.core.content.ContextCompat
 import com.igorg.scanereyes.databinding.ActivityMainBinding
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -32,10 +30,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var ws: WebSocketManager
 
-    private lateinit var cameraExecutor: ExecutorService
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        viewBinding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(viewBinding.root)
 
         ws = WebSocketManager {
             runOnUiThread {
@@ -44,9 +43,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         ws.connect("192.168.100.83")
-
-        viewBinding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(viewBinding.root)
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -57,8 +53,6 @@ class MainActivity : AppCompatActivity() {
 
         // Set up the listeners for take photo and video capture buttons
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
     private fun takePhoto() {
@@ -71,7 +65,7 @@ class MainActivity : AppCompatActivity() {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
             if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Scanereyes")
             }
         }
 
@@ -87,7 +81,7 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onError(exc: ImageCaptureException) {
-                    ws.notifyPhotoFailed(exc.message)
+                    ws.notifyPhotoFailed(exc.message ?: "Unknown error")
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
 
@@ -135,7 +129,9 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun requestPermissions() {}
+    private fun requestPermissions() {
+        activityResultLauncher.launch(REQUIRED_PERMISSIONS)
+    }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
@@ -162,15 +158,15 @@ class MainActivity : AppCompatActivity() {
 
 
     override fun onDestroy() {
+        ws.disconnect()
         super.onDestroy()
-        cameraExecutor.shutdown()
     }
 
     companion object {
         private const val TAG = "Scanereyes"
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private val REQUIRED_PERMISSIONS = mutableListOf(
-            Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO
+            Manifest.permission.CAMERA
         ).apply {
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                 add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
