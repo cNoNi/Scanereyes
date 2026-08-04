@@ -13,15 +13,12 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
-import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.igorg.scanereyes.databinding.ActivityMainBinding
 import com.igorg.scanereyes.websocket.WebSocketManager
 import java.text.SimpleDateFormat
 import java.util.Locale
-import android.util.Size
 private const val SERVER_IP = "192.168.100.83"
 
 class MainActivity : AppCompatActivity() {
@@ -131,18 +128,8 @@ class MainActivity : AppCompatActivity() {
                         viewBinding.viewFinder.surfaceProvider
                 }
 
-            val resolutionSelector = ResolutionSelector.Builder()
-                .setResolutionStrategy(
-                    ResolutionStrategy(
-                    Size(3024,3024),
-                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
-                    )
-                )
-                .build()
 
-            imageCapture = ImageCapture.Builder()
-                .setResolutionSelector(resolutionSelector)
-                .build()
+            imageCapture = ImageCapture.Builder().build()
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
