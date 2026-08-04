@@ -5,24 +5,27 @@ import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.MediaStore
-import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.ImageCapture
-import androidx.core.content.ContextCompat
-import com.igorg.scanereyes.databinding.ActivityMainBinding
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.core.Preview
+import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
-import android.util.Log
+import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.content.ContextCompat
+import com.igorg.scanereyes.databinding.ActivityMainBinding
 import com.igorg.scanereyes.websocket.WebSocketManager
 import java.text.SimpleDateFormat
 import java.util.Locale
-
-//typealias LumaListener = (luma: Double) -> Unit
+import android.util.Size
+private const val SERVER_IP = "192.168.100.83"
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var viewBinding: ActivityMainBinding
 
     private var imageCapture: ImageCapture? = null
@@ -41,118 +44,164 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        ws.connect("192.168.100.83")
+        ws.connect(SERVER_IP)
 
-        // Request camera permissions
         if (allPermissionsGranted()) {
             startCamera()
         } else {
             requestPermissions()
         }
 
-        // Set up the listeners for take photo and video capture buttons
-        viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
+        viewBinding.imageCaptureButton.setOnClickListener {
+            takePhoto()
+        }
     }
 
     private fun takePhoto() {
-        // Get a stable reference of the modifiable image capture use case
         val imageCapture = imageCapture ?: return
 
-        // Create time stamped name and MediaStore entry.
-        val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(System.currentTimeMillis())
+        val name = SimpleDateFormat(
+            FILENAME_FORMAT,
+            Locale.US
+        ).format(System.currentTimeMillis())
+
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Scanereyes")
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                "Pictures/Scanereyes"
+            )
         }
 
-        // Create output options object which contains file + metadata
         val outputOptions = ImageCapture.OutputFileOptions.Builder(
-                contentResolver, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues
-            ).build()
+            contentResolver,
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            contentValues
+        ).build()
 
-        // Set up image capture listener, which is triggered after photo has
-        // been taken
         imageCapture.takePicture(
             outputOptions,
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
+
                 override fun onError(exc: ImageCaptureException) {
-                    ws.notifyPhotoFailed(exc.message ?: "Unknown error")
-                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                    ws.notifyPhotoFailed(
+                        exc.message ?: "Unknown error"
+                    )
+
+                    Log.e(
+                        TAG,
+                        "Photo capture failed: ${exc.message}",
+                        exc
+                    )
                 }
 
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                override fun onImageSaved(
+                    output: ImageCapture.OutputFileResults
+                ) {
                     ws.notifyPhotoTaken()
+
                     val msg = "Photo capture succeeded: ${output.savedUri}"
-                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+
+                    Toast.makeText(
+                        baseContext,
+                        msg,
+                        Toast.LENGTH_SHORT
+                    ).show()
+
                     Log.d(TAG, msg)
                 }
-            })
+            }
+        )
     }
 
-
     private fun startCamera() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        val cameraProviderFuture =
+            ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            // Used to bind the lifecycle of cameras to the lifecycle owner
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            // Preview
-            val preview = Preview.Builder().build().also {
-                    it.surfaceProvider = viewBinding.viewFinder.surfaceProvider
+            val cameraProvider = cameraProviderFuture.get()
+
+            val preview = Preview.Builder()
+                .build()
+                .also {
+                    it.surfaceProvider =
+                        viewBinding.viewFinder.surfaceProvider
                 }
 
-            imageCapture = ImageCapture.Builder().build()
+            val resolutionSelector = ResolutionSelector.Builder()
+                .setResolutionStrategy(
+                    ResolutionStrategy(
+                    Size(3024,3024),
+                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                    )
+                )
+                .build()
 
-            // Select back camera as a default
+            imageCapture = ImageCapture.Builder()
+                .setResolutionSelector(resolutionSelector)
+                .build()
+
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
-                // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
 
-                // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture
+                    this,
+                    cameraSelector,
+                    preview,
+                    imageCapture
                 )
 
             } catch (exc: Exception) {
-                Log.e(TAG, "Use case binding failed", exc)
+                Log.e(
+                    TAG,
+                    "Use case binding failed",
+                    exc
+                )
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
-
     private fun requestPermissions() {
         activityResultLauncher.launch(REQUIRED_PERMISSIONS)
     }
 
-    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(
-            baseContext, it
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private val activityResultLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // Handle Permission granted/rejected
-        var permissionGranted = true
-        permissions.entries.forEach {
-            if (it.key in REQUIRED_PERMISSIONS && !it.value) permissionGranted = false
+    private fun allPermissionsGranted() =
+        REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(
+                baseContext,
+                it
+            ) == PackageManager.PERMISSION_GRANTED
         }
-        if (!permissionGranted) {
-            Toast.makeText(
-                baseContext, "Permission request denied", Toast.LENGTH_SHORT
-            ).show()
-        } else {
-            startCamera()
-        }
-    }
 
+    private val activityResultLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+
+            var permissionGranted = true
+
+            permissions.entries.forEach {
+                if (it.key in REQUIRED_PERMISSIONS && !it.value) {
+                    permissionGranted = false
+                }
+            }
+
+            if (!permissionGranted) {
+                Toast.makeText(
+                    baseContext,
+                    "Permission request denied",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                startCamera()
+            }
+        }
 
     override fun onDestroy() {
         ws.disconnect()
@@ -162,11 +211,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "Scanereyes"
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
-        private val REQUIRED_PERMISSIONS = mutableListOf(
+
+        private val REQUIRED_PERMISSIONS = arrayOf(
             Manifest.permission.CAMERA
-        ).apply {
-        }.toTypedArray()
+        )
     }
-
-
 }
