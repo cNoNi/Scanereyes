@@ -7,7 +7,8 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 class WebSocketManager(
-    private val onTakePhoto: () -> Unit
+    private val onTakePhoto: () -> Unit,
+    private val onConnectionStatusChanged: ((Boolean) -> Unit)? = null
 ) {
 
     private val client = OkHttpClient.Builder()
@@ -25,6 +26,7 @@ class WebSocketManager(
         serverIp = ip
         isManualDisconnect = false
         reconnectFuture?.cancel(true)
+        onConnectionStatusChanged?.invoke(false)
         doConnect()
     }
 
@@ -40,6 +42,7 @@ class WebSocketManager(
 
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d(TAG, "Połączono z ws://$ip:8765")
+                onConnectionStatusChanged?.invoke(true)
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -55,10 +58,12 @@ class WebSocketManager(
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(TAG, "Rozłączanie: $code / $reason")
+                onConnectionStatusChanged?.invoke(false)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(TAG, "Połączenie zamknięte: $code / $reason")
+                onConnectionStatusChanged?.invoke(false)
                 scheduleReconnect()
             }
 
@@ -66,6 +71,7 @@ class WebSocketManager(
                 webSocket: WebSocket, t: Throwable, response: Response?
             ) {
                 Log.e(TAG, "Błąd WebSocket: ${t.message}")
+                onConnectionStatusChanged?.invoke(false)
                 scheduleReconnect()
             }
         })
@@ -98,6 +104,7 @@ class WebSocketManager(
         reconnectFuture?.cancel(true)
         webSocket?.close(1000, "Disconnect requested")
         webSocket = null
+        onConnectionStatusChanged?.invoke(false)
     }
 
     companion object {

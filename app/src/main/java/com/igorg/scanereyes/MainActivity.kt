@@ -46,9 +46,16 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        ws = WebSocketManager {
-            runOnUiThread { takePhoto() }
-        }
+        ws = WebSocketManager(
+            onTakePhoto = {
+                runOnUiThread { takePhoto() }
+            },
+            onConnectionStatusChanged = { isConnected ->
+                runOnUiThread {
+                    updateConnectionStatus(isConnected)
+                }
+            }
+        )
 
         val serverIp = getSavedServerIp()
         ws.connect(serverIp)
@@ -73,6 +80,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupTapToFocus()
+    }
+
+    private fun updateConnectionStatus(isConnected: Boolean) {
+        if (isConnected) {
+            binding.connectionStatus.setText(R.string.status_connected)
+            binding.connectionStatus.setBackgroundResource(R.drawable.bg_connection_status_connected)
+        } else {
+            binding.connectionStatus.setText(R.string.status_disconnected)
+            binding.connectionStatus.setBackgroundResource(R.drawable.bg_connection_status_disconnected)
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
