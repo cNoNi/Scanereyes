@@ -19,26 +19,24 @@ import com.igorg.scanereyes.databinding.ActivityMainBinding
 import com.igorg.scanereyes.websocket.WebSocketManager
 import java.text.SimpleDateFormat
 import java.util.Locale
-private const val SERVER_IP = "192.168.100.83"
+
+private const val SERVER_IP = "192.168.100.118"
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var viewBinding: ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
+    private lateinit var ws: WebSocketManager
 
     private var imageCapture: ImageCapture? = null
-
-    private lateinit var ws: WebSocketManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        viewBinding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(viewBinding.root)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         ws = WebSocketManager {
-            runOnUiThread {
-                takePhoto()
-            }
+            runOnUiThread { takePhoto() }
         }
 
         ws.connect(SERVER_IP)
@@ -49,7 +47,7 @@ class MainActivity : AppCompatActivity() {
             requestPermissions()
         }
 
-        viewBinding.imageCaptureButton.setOnClickListener {
+        binding.imageCaptureButton.setOnClickListener {
             takePhoto()
         }
     }
@@ -83,15 +81,7 @@ class MainActivity : AppCompatActivity() {
             object : ImageCapture.OnImageSavedCallback {
 
                 override fun onError(exc: ImageCaptureException) {
-                    ws.notifyPhotoFailed(
-                        exc.message ?: "Unknown error"
-                    )
-
-                    Log.e(
-                        TAG,
-                        "Photo capture failed: ${exc.message}",
-                        exc
-                    )
+                    Log.e(TAG, "Photo capture failed", exc)
                 }
 
                 override fun onImageSaved(
@@ -99,15 +89,16 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     ws.notifyPhotoTaken()
 
-                    val msg = "Photo capture succeeded: ${output.savedUri}"
+                    val message =
+                        "Photo capture succeeded: ${output.savedUri}"
 
                     Toast.makeText(
-                        baseContext,
-                        msg,
+                        this@MainActivity,
+                        message,
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    Log.d(TAG, msg)
+                    Log.d(TAG, message)
                 }
             }
         )
@@ -124,69 +115,53 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    it.surfaceProvider =
-                        viewBinding.viewFinder.surfaceProvider
+                    it.surfaceProvider = binding.viewFinder.surfaceProvider
                 }
 
-
             imageCapture = ImageCapture.Builder().build()
-
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
                 cameraProvider.unbindAll()
 
                 cameraProvider.bindToLifecycle(
                     this,
-                    cameraSelector,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     imageCapture
                 )
 
             } catch (exc: Exception) {
-                Log.e(
-                    TAG,
-                    "Use case binding failed",
-                    exc
-                )
+                Log.e(TAG, "Use case binding failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
     private fun requestPermissions() {
-        activityResultLauncher.launch(REQUIRED_PERMISSIONS)
+        permissionLauncher.launch(REQUIRED_PERMISSIONS)
     }
 
-    private fun allPermissionsGranted() =
+    private fun allPermissionsGranted(): Boolean =
         REQUIRED_PERMISSIONS.all {
             ContextCompat.checkSelfPermission(
-                baseContext,
+                this,
                 it
             ) == PackageManager.PERMISSION_GRANTED
         }
 
-    private val activityResultLauncher =
+    private val permissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
 
-            var permissionGranted = true
-
-            permissions.entries.forEach {
-                if (it.key in REQUIRED_PERMISSIONS && !it.value) {
-                    permissionGranted = false
-                }
-            }
-
-            if (!permissionGranted) {
+            if (permissions.all { it.value }) {
+                startCamera()
+            } else {
                 Toast.makeText(
-                    baseContext,
-                    "Permission request denied",
+                    this,
+                    "Camera permission denied",
                     Toast.LENGTH_SHORT
                 ).show()
-            } else {
-                startCamera()
             }
         }
 
