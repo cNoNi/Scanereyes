@@ -1,4 +1,14 @@
 <resources>
     <string name="app_name">Scanereyes</string>
     <string name="take_photo">Take Photo</string>
+    <string name="settings">Ustawienia</string>
+    <string name="settings_dialog_title">Ustawienia serwera i aparatu</string>
+    <string name="settings_dialog_message">Wprowadź adres IP serwera WebSocket:</string>
+    <string name="force_autofocus">Wymuszaj autofocus przed zdjęciem</string>
+    <string name="focus_button_desc">Ustaw ostrość</string>
+    <string name="focusing">Ustawianie ostrości…</string>
+    <string name="save">Zapisz</string>
+    <string name="cancel">Anuluj</string>
+    <string name="ip_saved">Zapisano ustawienia</string>
+    <string name="ip_empty_error">Adres IP nie może być pusty</string>
 </resources>
